@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/Font.hpp>
 #include <SFML/System/Clock.hpp>
 #include <SFML/System/Time.hpp>
 #include <SFML/System/Vector2.hpp>
@@ -58,9 +59,6 @@ void initGame(Game *G)
     G->particlesCircle[i].setPosition(G->particles[i]);
     G->particlesCircle[i].setOutlineColor(sf::Color::Red);
     G->particlesCircle[i].setOutlineThickness(1.0f);
-    G->particlesCircle[i].setOrigin(
-        G->particlesCircle[i].getGeometricCenter()
-        );
   }
   G->player = {SAFE_ZONE_WIDTH / 2, WINDOW_HEIGHT / 2};
   G->state = PLAYING;
@@ -83,6 +81,11 @@ sf::Vector2<float> clamp(sf::Vector2<float> p, sf::Vector2<float> bounds)
   return (p);
 }
 
+sf::Vector2<float> normalize(sf::Vector2<float> u) {
+  float norm = sqrt(u.x * u.x + u.y * u.y);
+  u.x /= norm; u.y /= norm;
+  return (u);
+}
 void movePlayer(Game *G, float dt_s)
 {
   float v_pps = PLAYER_SPEED; // Pixels per second
@@ -99,7 +102,7 @@ void movePlayer(Game *G, float dt_s)
   if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)
       || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
     dp.y++;
-  if (dp.x || dp.y) dp = dp.normalized();
+  if (dp.x || dp.y) dp = normalize(dp);
   G->player += dp * dt_s * v_pps;
   G->player = clamp(G->player, {WINDOW_WIDTH, WINDOW_HEIGHT});
   G->playerCircle.setPosition(G->player);
@@ -190,7 +193,7 @@ int main()
 
 sf::Clock          clocc;
 sf::Clock          shaderClock;
-sf::Font           font("DelaGothicOne-Regular.ttf");
+sf::Font           font; font.loadFromFile("DelaGothicOne-Regular.ttf");
 sf::Shader         bgShader;
 sf::RectangleShape fullScreenQuad;
 
@@ -201,24 +204,21 @@ sf::RectangleShape fullScreenQuad;
   if (!bgShader.loadFromFile("bgShader.frag",sf::Shader::Type::Fragment))
     return (1);
   G.score = 0;
-  G.instructions.text = new sf::Text(font);
-  G.instructions.text->setString("Get to the other side!");
+  G.instructions.text = new sf::Text("Get to the other side!", font);
   G.instructions.text->setCharacterSize(50);
   G.instructions.text->setFillColor(sf::Color::Red);
   G.instructions.text->setStyle(sf::Text::Bold);
   G.instructions.text->setPosition({WINDOW_WIDTH / 4, 0});
   G.instructions.show = true;
-  G.gameWon.text = new sf::Text(font);
-  G.gameWon.text->setString("We did it!");
+  G.gameWon.text = new sf::Text("We did it!", font);
   G.gameWon.text->setCharacterSize(100);
   G.gameWon.text->setFillColor(sf::Color::Green);
   G.gameWon.text->setStyle(sf::Text::Bold);
   G.gameWon.text->setPosition({WINDOW_WIDTH / 4, WINDOW_HEIGHT / 2});
-  G.scoreText.text = new sf::Text(font);
+  G.scoreText.text = new sf::Text("",font);
   G.scoreText.text->setPosition({WINDOW_WIDTH / 3, 500});
   G.instructions.show = true;
-  G.gameOver.text = new sf::Text(font);
-  G.gameOver.text->setString("Bummer!");
+  G.gameOver.text = new sf::Text("Bummer!", font);
   G.gameOver.text->setCharacterSize(100);
   G.gameOver.text->setFillColor(sf::Color::White);
   G.gameOver.text->setStyle(sf::Text::Bold);
@@ -227,7 +227,6 @@ sf::RectangleShape fullScreenQuad;
   G.playerCircle = sf::CircleShape(PLAYER_RADIUS);
   G.playerCircle.setOutlineColor(sf::Color::Blue);
   G.playerCircle.setOutlineThickness(5.0f);
-  G.playerCircle.setOrigin(G.playerCircle.getGeometricCenter());
   initGame(&G);
   G.safeZone = sf::RectangleShape({SAFE_ZONE_WIDTH, WINDOW_HEIGHT});
   G.safeZone.setPosition({0,0});
@@ -237,8 +236,8 @@ sf::RectangleShape fullScreenQuad;
   G.winZone.setFillColor(sf::Color::Blue);
 
   sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH,WINDOW_HEIGHT}), "window");
-  clocc.start();
-  shaderClock.start();
+  clocc.restart();
+  shaderClock.restart();
   while (window.isOpen())
   {
     update(&G);
@@ -256,13 +255,12 @@ sf::RectangleShape fullScreenQuad;
     window.draw(G.winZone);
     window.draw(G.playerCircle);
     window.display();
-    while (const std::optional event = window.pollEvent())
+    sf::Event event;
+    while (window.pollEvent(event))
     {
-      if ((event->is<sf::Event::Closed>()) 
-          || (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)))
-      {
+      if (event.type == sf::Event::Closed) window.close();
+      if (event.type == sf::Event::KeyPressed && (event.key.code == sf::Keyboard::Escape))
         window.close();
-      }
     }
   }
   delete G.instructions.text;
